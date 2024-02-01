@@ -1,8 +1,8 @@
 FROM mambaorg/micromamba
 
-COPY .env .
 COPY environment.yml .
+RUN micromamba install -n base -f environment.yml -y
+
+COPY .env .
 COPY build_vrt.py .
 COPY build_zarr.py .
-
-RUN micromamba install -n base -f environment.yml -y
