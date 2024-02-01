@@ -35,6 +35,7 @@ def build_vrt(s3url: str, out: str, runs: Optional[int] = None):
             s3url_run = s3url.format(run=i)
             files = glob_s3_files(s3url_run)
             out_path = Path(out).with_suffix(f".{i}.vrt")
+            print(f"Run {i} of {runs}: ", end="")
             run_gdalbuildvrt(out_path, files)
     else:
         files = glob_s3_files(s3url)
