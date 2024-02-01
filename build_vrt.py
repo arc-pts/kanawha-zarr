@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 import s3fs
 
 import argparse
+from datetime import datetime
 import os
 from pathlib import Path
 import subprocess
@@ -30,16 +31,19 @@ def glob_s3_files(s3url: str) -> List[str]:
 
 
 def build_vrt(s3url: str, out: str, runs: Optional[int] = None):
+    d1 = datetime.now()
     if runs:
         for i in range(1, runs + 1):
             s3url_run = s3url.format(run=i)
             files = glob_s3_files(s3url_run)
             out_path = Path(out).with_suffix(f".{i}.vrt")
-            print(f"Run {i} of {runs}: ", end="")
+            print(f"Run {i} of {runs}...")
             run_gdalbuildvrt(out_path, files)
     else:
         files = glob_s3_files(s3url)
         run_gdalbuildvrt(out, files)
+    duration = datetime.now() - d1
+    print(f"Done. Took: {duration.total_seconds() / 60:.2f} minutes")
 
 
 if __name__ == "__main__":
