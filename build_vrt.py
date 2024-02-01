@@ -36,8 +36,9 @@ def build_vrt(s3url: str, out: str, runs: Optional[int] = None):
             files = glob_s3_files(s3url_run)
             out_path = Path(out).with_suffix(f".{i}.vrt")
             run_gdalbuildvrt(out_path, files)
-    files = glob_s3_files(s3url)
-    run_gdalbuildvrt(out, files)
+    else:
+        files = glob_s3_files(s3url)
+        run_gdalbuildvrt(out, files)
 
 
 if __name__ == "__main__":
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     parser.add_argument("s3url", help="S3 URL to the data, including wildcards")
     parser.add_argument("out", help="Output VRT file name")
     parser.add_argument("--runs", type=int,
-                        help="Number of runs to process, if S3 URL includes \{run\}",
+                        help="Number of runs to process, if S3 URL includes '{run}'",
                         default=None, required=False)
     args = parser.parse_args()
     build_vrt(args.s3url, args.out, args.runs)

@@ -64,8 +64,9 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--vrts", nargs="+", help="VRT files")
     group.add_argument("--s3url", help="S3 URL")
-    parser.add_argument("--runs", help="Number of runs to process, if S3 URL includes \{run\}",
-                        type=int)
+    parser.add_argument("--runs", type=int,
+                        help="Number of runs to process, if S3 URL includes '{run}'",
+                        default=None, required=False)
     parser.add_argument("--zarr_out", help="Output Zarr dataset")
     args = parser.parse_args()
     build_zarr(args.vrts, args.s3url, args.zarr_out)
