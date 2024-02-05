@@ -42,12 +42,13 @@ def set_max_pixelfunc(vrt: Path):
         lines = f.readlines()
     for i, line in enumerate(lines):
         if "<VRTRasterBand" in line:
+            lines[i] = f'  <VRTRasterBand dataType="Float32" band="1" subClass="VRTDerivedRasterBand">\n'
             lines.insert(i + 1, f'    <PixelFunctionType>max_pixel_value</PixelFunctionType>\n')
             lines.insert(i + 2, f'    <PixelFunctionLanguage>Python</PixelFunctionLanguage>\n')
             lines.insert(i + 3, f'    <PixelFunctionCode><![CDATA[\n')
             lines.insert(i + 4, "import numpy as np\n")
-            lines.insert(i + 4, inspect.getsource(max_pixel_value))
-            lines.insert(i + 5, f'    ]]></PixelFunctionCode>\n')
+            lines.insert(i + 5, inspect.getsource(max_pixel_value))
+            lines.insert(i + 6, f'    ]]></PixelFunctionCode>\n')
             break
     with open(vrt, "w") as f:
         f.writelines(lines)
