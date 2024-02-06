@@ -1,0 +1,15 @@
+{
+    "build": {
+        "dockerfile": "../Dockerfile"
+    },
+    "runArgs": [
+        "--env-file", ".env"
+    ],
+    "containerEnv": {
+        "NODE_EXTRA_CA_CERTS": "${localEnv:NODE_EXTRA_CA_CERTS}"
+    },
+    "mounts": [
+        "source=/usr/local/share/ca-certificates,target=/usr/local/share/ca-certificates,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.aws,target=/home/jovyan/.aws,type=bind,consistency=cached"
+    ]
+}

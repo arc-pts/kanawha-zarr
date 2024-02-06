@@ -1,8 +1,3 @@
-FROM mambaorg/micromamba
+FROM pangeo/pangeo-notebook:latest
 
-COPY environment.yml .
-RUN micromamba install -n base -f environment.yml -y
-
-COPY .env .
-COPY build_vrt.py .
-COPY build_zarr.py .
+RUN /srv/conda/envs/notebook/bin/pip install python-dotenv
