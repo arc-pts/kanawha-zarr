@@ -13,6 +13,7 @@ import xarray as xr
 
 import argparse
 from datetime import datetime
+import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -95,8 +96,8 @@ def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
             print(f"Creating new cluster with {cluster_workers} workers, scheduler timeout {cluster_scheduler_timeout} mins...")
             environment = {
                 # "GDAL_VRT_ENABLE_PYTHON": "YES",
-                "AWS_ACCESS_KEY_ID": aws_key,
-                "AWS_SECRET_ACCESS_KEY": aws_secret,
+                "AWS_ACCESS_KEY_ID": os.environ.get(aws_key),
+                "AWS_SECRET_ACCESS_KEY": os.environ.get(aws_secret),
             }
             cluster = create_cluster(n_workers=cluster_workers, scheduler_timeout=cluster_scheduler_timeout,
                                      memory=cluster_worker_memory, vcpus=cluster_worker_vcpus,
@@ -135,8 +136,8 @@ if __name__ == "__main__":
                          default=5, required=False)
     parser.add_argument("--cluster-address", help="Address of an existing cluster to use", required=False)
     parser.add_argument("--cluster-shutdown", help="Shutdown the cluster", action="store_true")
-    parser.add_argument("--aws-key", help="AWS Access Key ID for reading/writing S3 data", required=False)
-    parser.add_argument("--aws-secret", help="AWS Secret Access Key for reading/writing S3 data", required=False)
+    parser.add_argument("--aws-key", help="Name of env var for AWS Access Key ID to read/write S3 data", required=False)
+    parser.add_argument("--aws-secret", help="Name of env var for AWS Secret Access Key to read/write S3 data", required=False)
     args = parser.parse_args()
     build_zarr(args.vrts, args.s3url, args.runs, args.zarr_out, args.cluster, args.cluster_workers,
                args.cluster_worker_vcpus, args.cluster_worker_memory,
