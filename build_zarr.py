@@ -90,6 +90,8 @@ def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
     print(f"Started: {datetime.now():%Y-%m-%d %H:%M:%S}")
     aws_key = os.environ.get(aws_key_name)
     aws_secret = os.environ.get(aws_secret_name)
+    if aws_key is None or aws_secret is None:
+        raise ValueError(f"AWS credentials for S3 not found ('{aws_key_name}'/'{aws_secret_name})")
     if cluster and (vrts or s3url):
         if cluster_address:
             print(f"Connecting to existing cluster at {cluster_address}...")
@@ -138,10 +140,10 @@ if __name__ == "__main__":
                          default=5, required=False)
     parser.add_argument("--cluster-address", help="Address of an existing cluster to use", required=False)
     parser.add_argument("--cluster-shutdown", help="Shutdown the cluster", action="store_true")
-    parser.add_argument("--aws-key", help="Name of env var for AWS Access Key ID to read/write S3 data", required=False)
-    parser.add_argument("--aws-secret", help="Name of env var for AWS Secret Access Key to read/write S3 data", required=False)
+    parser.add_argument("--aws-key-name", help="Name of env var for AWS Access Key ID to read/write S3 data", required=False)
+    parser.add_argument("--aws-secret-name", help="Name of env var for AWS Secret Access Key to read/write S3 data", required=False)
     args = parser.parse_args()
     build_zarr(args.vrts, args.s3url, args.runs, args.zarr_out, args.cluster, args.cluster_workers,
                args.cluster_worker_vcpus, args.cluster_worker_memory,
                args.cluster_scheduler_timeout, args.cluster_address, args.cluster_shutdown,
-               args.aws_key, args.aws_secret)
+               args.aws_key_name, args.aws_secret_name)
