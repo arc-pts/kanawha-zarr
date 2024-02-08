@@ -86,8 +86,10 @@ def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
                cluster_worker_vcpus: int = 4, cluster_worker_memory: int = 16,
                cluster_scheduler_timeout: int = 5,
                cluster_address: Optional[str] = None, cluster_shutdown: bool = False,
-               aws_key: Optional[str] = None, aws_secret: Optional[str] = None):
+               aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None):
     print(f"Started: {datetime.now():%Y-%m-%d %H:%M:%S}")
+    aws_key = os.environ.get(aws_key_name)
+    aws_secret = os.environ.get(aws_secret_name)
     if cluster and (vrts or s3url):
         if cluster_address:
             print(f"Connecting to existing cluster at {cluster_address}...")
@@ -96,8 +98,8 @@ def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
             print(f"Creating new cluster with {cluster_workers} workers, scheduler timeout {cluster_scheduler_timeout} mins...")
             environment = {
                 # "GDAL_VRT_ENABLE_PYTHON": "YES",
-                "AWS_ACCESS_KEY_ID": os.environ.get(aws_key),
-                "AWS_SECRET_ACCESS_KEY": os.environ.get(aws_secret),
+                "AWS_ACCESS_KEY_ID": aws_key,
+                "AWS_SECRET_ACCESS_KEY": aws_secret,
             }
             cluster = create_cluster(n_workers=cluster_workers, scheduler_timeout=cluster_scheduler_timeout,
                                      memory=cluster_worker_memory, vcpus=cluster_worker_vcpus,
