@@ -1,20 +1,28 @@
 """Build Zarr dataset"""
 from build_vrt import build_vrt
+from cluster import create_cluster
 
+import botocore
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+from dask.distributed import Client
+import rasterio
+from rasterio.session import AWSSession
+import s3fs
 import xarray as xr
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 load_dotenv()
 
-
 ZARR_CHUNKS = {
-    "x": 512,
-    "y": 512,
+    "x": 2048,
+    "y": 2048,
 }
+
 
 def build_temp_vrt(s3url: str, zarr_out: str, run: Optional[int] = None) -> Path:
     vrt_dir = Path("vrt")
@@ -27,15 +35,35 @@ def build_temp_vrt(s3url: str, zarr_out: str, run: Optional[int] = None) -> Path
     return vrt
 
 
-def build_zarr_from_vrt(vrt: str, zarr_out: str):
-    ds = xr.open_dataset(vrt).squeeze(drop=True)
+def build_zarr_from_vrt(vrt: str, zarr_out: str, aws_key: Optional[str] = None,
+                        aws_secret: Optional[str] = None):
+    fs = s3fs.S3FileSystem(key=aws_key, secret=aws_secret)
+    session = AWSSession(aws_access_key_id=aws_key, aws_secret_access_key=aws_secret)
+    with rasterio.Env(session=session):
+        ds = xr.open_dataset(vrt, engine="rasterio")
+    ds = ds.rename({"band": "run", "band_data": "depth"})
     ds = ds.chunk(ZARR_CHUNKS)
-    ds.to_zarr(zarr_out, mode="a")
+    store = s3fs.S3Map(root=zarr_out, s3=fs)
+    try:
+        existing_ds = xr.open_zarr(store)
+        if "run" in existing_ds.dims:
+            mode = "a"
+            append_dim = "run"
+            run = existing_ds.run.max().item() + 1
+            ds["run"] = [run]
+        else:
+            mode = "w"
+            append_dim = None
+    except Exception as e:  # barf... having trouble handling NoSuchKey error
+        mode = "w"
+        append_dim = None
+    ds.to_zarr(store, mode=mode, write_empty_chunks=False, append_dim=append_dim)
 
 
 def build_from_s3(s3url: str, zarr_out: str, runs: Optional[int] = None):
     if runs:
         for i in range(1, runs + 1):
+            print(f"Run {i} of {runs}...")
             s3url = s3url.format(run=i)
             vrt = build_temp_vrt(s3url, zarr_out)
             build_zarr_from_vrt(vrt, zarr_out)
@@ -44,19 +72,47 @@ def build_from_s3(s3url: str, zarr_out: str, runs: Optional[int] = None):
         build_zarr_from_vrt(vrt, zarr_out)
 
 
-def build_from_vrts(vrts: List[str], zarr_out: str):
-    for vrt in vrts:
-        build_zarr_from_vrt(vrt, zarr_out)
+def build_from_vrts(vrts: List[str], zarr_out: str, aws_key: Optional[str] = None,
+                    aws_secret: Optional[str] = None):
+    for i, vrt in enumerate(vrts):
+        print(f"Processing {i + 1} of {len(vrts)} VRTs...")
+        build_zarr_from_vrt(vrt, zarr_out, aws_key=aws_key, aws_secret=aws_secret)
 
 
 def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
-               runs: Optional[int], zarr_out: str):
+               runs: Optional[int], zarr_out: str, cluster: bool = False,
+               cluster_workers: int = 2, 
+               cluster_worker_vcpus: int = 4, cluster_worker_memory: int = 16,
+               cluster_scheduler_timeout: int = 5,
+               cluster_address: Optional[str] = None, cluster_shutdown: bool = False,
+               aws_key: Optional[str] = None, aws_secret: Optional[str] = None):
+    print(f"Started: {datetime.now():%Y-%m-%d %H:%M:%S}")
+    if cluster and (vrts or s3url):
+        if cluster_address:
+            print(f"Connecting to existing cluster at {cluster_address}...")
+            client = Client(cluster_address)
+        else:
+            print(f"Creating new cluster with {cluster_workers} workers, scheduler timeout {cluster_scheduler_timeout} mins...")
+            environment = {
+                # "GDAL_VRT_ENABLE_PYTHON": "YES",
+                "AWS_ACCESS_KEY_ID": aws_key,
+                "AWS_SECRET_ACCESS_KEY": aws_secret,
+            }
+            cluster = create_cluster(n_workers=cluster_workers, scheduler_timeout=cluster_scheduler_timeout,
+                                     memory=cluster_worker_memory, vcpus=cluster_worker_vcpus,
+                                     environment=environment)
+            client = Client(cluster)
+        print(client)
     if vrts:
-        build_from_vrts(vrts, zarr_out)
+        build_from_vrts(vrts, zarr_out, aws_key=aws_key, aws_secret=aws_secret)
     elif s3url:
         build_from_s3(s3url, zarr_out, runs=runs)
     else:
         raise ValueError("No input provided")
+    if cluster and cluster_shutdown:
+        print("Closing cluster...")
+        cluster.close()
+    print(f"Finished: {datetime.now():%Y-%m-%d %H:%M:%S}")
 
 
 if __name__ == "__main__":
@@ -67,6 +123,22 @@ if __name__ == "__main__":
     parser.add_argument("--runs", type=int,
                         help="Number of runs to process, if S3 URL includes '{run}'",
                         default=None, required=False)
-    parser.add_argument("--zarr_out", help="Output Zarr dataset")
+    parser.add_argument("--zarr-out", help="Output Zarr dataset")
+    parser.add_argument("--cluster", action="store_true", help="Run on AWS Fargate cluster")
+    parser.add_argument("--cluster-workers", type=int, help="Number of workers for the cluster",
+                         default=2, required=False)
+    parser.add_argument("--cluster-worker-vcpus", type=int, help="Number of vCPUs per worker for the cluster",
+                        default=4, required=False)
+    parser.add_argument("--cluster-worker-memory", type=int, help="Memory per worker for the cluster (GB)",
+                        default=16, required=False)
+    parser.add_argument("--cluster-scheduler-timeout", type=int, help="Scheduler timeout for the cluster (mins)",
+                         default=5, required=False)
+    parser.add_argument("--cluster-address", help="Address of an existing cluster to use", required=False)
+    parser.add_argument("--cluster-shutdown", help="Shutdown the cluster", action="store_true")
+    parser.add_argument("--aws-key", help="AWS Access Key ID for reading/writing S3 data", required=False)
+    parser.add_argument("--aws-secret", help="AWS Secret Access Key for reading/writing S3 data", required=False)
     args = parser.parse_args()
-    build_zarr(args.vrts, args.s3url, args.zarr_out)
+    build_zarr(args.vrts, args.s3url, args.runs, args.zarr_out, args.cluster, args.cluster_workers,
+               args.cluster_worker_vcpus, args.cluster_worker_memory,
+               args.cluster_scheduler_timeout, args.cluster_address, args.cluster_shutdown,
+               args.aws_key, args.aws_secret)
