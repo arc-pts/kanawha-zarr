@@ -88,14 +88,14 @@ def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
                cluster_address: Optional[str] = None, cluster_shutdown: bool = False,
                aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None):
     print(f"Started: {datetime.now():%Y-%m-%d %H:%M:%S}")
-    aws_key = os.environ.get(aws_key_name)
-    aws_secret = os.environ.get(aws_secret_name)
+    aws_key = os.getenv(aws_key_name)
+    aws_secret = os.getenv(aws_secret_name)
     if aws_key is None or aws_secret is None:
         raise ValueError(f"AWS credentials for S3 not found ('{aws_key_name}'/'{aws_secret_name})")
     else:
         print(f"Using AWS credentials '{aws_key_name}'/'{aws_secret_name}'")
-        print(f"AWS key: {aws_key[0] + '*' * (len(aws_key) - 2) + aws_key[-1]}")
-        print(f"AWS secret: {aws_secret[0] + '*' * (len(aws_secret) - 2) + aws_key[-1]}")
+        print(f"AWS key: {aws_key[0] + '*' * (len(aws_key) - 1)}")
+        print(f"AWS secret: {aws_secret[0] + '*' * (len(aws_secret) - 1)}")
     if cluster and (vrts or s3url):
         if cluster_address:
             print(f"Connecting to existing cluster at {cluster_address}...")
