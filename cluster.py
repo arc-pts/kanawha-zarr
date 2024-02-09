@@ -27,7 +27,9 @@ def create_cluster(n_workers: int = 2, scheduler_timeout: int = 5,
                              worker_nthreads=vcpus * 1, 
                              image="pangeo/pangeo-notebook:latest",
                              environment=environment,
-                             scheduler_timeout=f"{scheduler_timeout} minutes")
+                             scheduler_timeout=f"{scheduler_timeout} minutes",
+                             scheulder_cpu=2 * 1024,
+                             scheduler_mem=2 * 8 * 1024,)
     print(f"Cluster: {cluster}")
     print(f"Cluster dashboard: {cluster.dashboard_link}")
     return cluster
