@@ -138,7 +138,7 @@ def build_zarr(multiband_vrt: Optional[str], vrts: Optional[List[str]], s3url: O
         build_from_s3(s3url, zarr_out, runs=runs)
     elif multiband_vrt:
         # TODO
-        pass
+        build_zarr_from_multiband_vrt(multiband_vrt, zarr_out, aws_key=aws_key, aws_secret=aws_secret)
     else:
         raise ValueError("No input provided")
     if cluster and cluster_shutdown:
