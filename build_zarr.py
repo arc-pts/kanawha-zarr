@@ -38,6 +38,10 @@ def build_temp_vrt(s3url: str, zarr_out: str, run: Optional[int] = None) -> Path
 
 def build_zarr_from_vrt(vrt: str, zarr_out: str, aws_key: Optional[str] = None,
                         aws_secret: Optional[str] = None):
+    # TODO: pull run number from VRT filename
+    # TODO: skip a VRT if it already exists in the Zarr dataset
+    # TODO: skip a VRT if it doesn't exist in S3
+    # TODO: batch process a subset of multiple VRTs to minimize cluster idle time
     fs = s3fs.S3FileSystem(key=aws_key, secret=aws_secret)
     session = AWSSession(aws_access_key_id=aws_key, aws_secret_access_key=aws_secret)
     with rasterio.Env(session=session):
@@ -61,6 +65,22 @@ def build_zarr_from_vrt(vrt: str, zarr_out: str, aws_key: Optional[str] = None,
     ds.to_zarr(store, mode=mode, write_empty_chunks=False, append_dim=append_dim)
 
 
+def build_zarr_from_multiband_vrt(vrt: str, zarr_out: str, aws_key: Optional[str] = None,
+                                  aws_secret: Optional[str] = None):
+    fs = s3fs.S3FileSystem(key=aws_key, secret=aws_secret)
+    session = AWSSession(aws_access_key_id=aws_key, aws_secret_access_key=aws_secret)
+    with rasterio.Env(session=session):
+        ds = xr.open_dataset(vrt, engine="rasterio")
+    ds = ds.rename({"band": "run", "band_data": "depth"})
+    ds = ds.chunk({
+        "run": 1000,
+        "x": 64,
+        "y": 64,
+    })
+    store = s3fs.S3Map(root=zarr_out, s3=fs)
+    ds.to_zarr(store, mode="w", write_empty_chunks=False)
+
+
 def build_from_s3(s3url: str, zarr_out: str, runs: Optional[int] = None):
     if runs:
         for i in range(1, runs + 1):
@@ -80,7 +100,7 @@ def build_from_vrts(vrts: List[str], zarr_out: str, aws_key: Optional[str] = Non
         build_zarr_from_vrt(vrt, zarr_out, aws_key=aws_key, aws_secret=aws_secret)
 
 
-def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
+def build_zarr(multiband_vrt: Optional[str], vrts: Optional[List[str]], s3url: Optional[str],
                runs: Optional[int], zarr_out: str, cluster: bool = False,
                cluster_workers: int = 2, 
                cluster_worker_vcpus: int = 4, cluster_worker_memory: int = 16,
@@ -96,7 +116,7 @@ def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
         print(f"Using AWS credentials '{aws_key_name}'/'{aws_secret_name}'")
         print(f"AWS key: {aws_key[0] + '*' * (len(aws_key) - 1)}")
         print(f"AWS secret: {aws_secret[0] + '*' * (len(aws_secret) - 1)}")
-    if cluster and (vrts or s3url):
+    if cluster and (vrts or s3url or multiband_vrt):
         if cluster_address:
             print(f"Connecting to existing cluster at {cluster_address}...")
             client = Client(cluster_address)
@@ -116,6 +136,9 @@ def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
         build_from_vrts(vrts, zarr_out, aws_key=aws_key, aws_secret=aws_secret)
     elif s3url:
         build_from_s3(s3url, zarr_out, runs=runs)
+    elif multiband_vrt:
+        # TODO
+        pass
     else:
         raise ValueError("No input provided")
     if cluster and cluster_shutdown:
@@ -127,7 +150,8 @@ def build_zarr(vrts: Optional[List[str]], s3url: Optional[str],
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build Zarr dataset from VRTs")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--vrts", nargs="+", help="VRT files")
+    group.add_argument("--multiband-vrt", help="Single multiband VRT file")
+    group.add_argument("--vrts", nargs="+", help="Mulitple single-band VRT files")
     group.add_argument("--s3url", help="S3 URL")
     parser.add_argument("--runs", type=int,
                         help="Number of runs to process, if S3 URL includes '{run}'",
@@ -147,7 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("--aws-key-name", help="Name of env var for AWS Access Key ID to read/write S3 data", required=False)
     parser.add_argument("--aws-secret-name", help="Name of env var for AWS Secret Access Key to read/write S3 data", required=False)
     args = parser.parse_args()
-    build_zarr(args.vrts, args.s3url, args.runs, args.zarr_out, args.cluster, args.cluster_workers,
+    build_zarr(args.multiband_vrt, args.vrts, args.s3url, args.runs, args.zarr_out, args.cluster, args.cluster_workers,
                args.cluster_worker_vcpus, args.cluster_worker_memory,
                args.cluster_scheduler_timeout, args.cluster_address, args.cluster_shutdown,
                args.aws_key_name, args.aws_secret_name)
