@@ -79,7 +79,7 @@ def build_zarr_from_multiband_vrt(vrt: str, zarr_out: str, aws_key: Optional[str
         "y": 2048,
     })
     store = s3fs.S3Map(root=zarr_out, s3=fs)
-    ds.to_zarr(store, mode="w", write_empty_chunks=False)
+    ds.to_zarr(store, mode="w", write_empty_chunks=False, consolidated=True)
 
 
 def build_from_s3(s3url: str, zarr_out: str, runs: Optional[int] = None):
