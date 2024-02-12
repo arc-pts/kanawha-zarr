@@ -72,10 +72,11 @@ def build_zarr_from_multiband_vrt(vrt: str, zarr_out: str, aws_key: Optional[str
     with rasterio.Env(session=session):
         ds = xr.open_dataset(vrt, engine="rasterio")
     ds = ds.rename({"band": "run", "band_data": "depth"})
+    # TODO: wide chunking!!! narrow chunking upfront is waaaay to slow
     ds = ds.chunk({
-        "run": 1000,
-        "x": 64,
-        "y": 64,
+        "run": 1,
+        "x": 2048,
+        "y": 2048,
     })
     store = s3fs.S3Map(root=zarr_out, s3=fs)
     ds.to_zarr(store, mode="w", write_empty_chunks=False)
@@ -137,7 +138,6 @@ def build_zarr(multiband_vrt: Optional[str], vrts: Optional[List[str]], s3url: O
     elif s3url:
         build_from_s3(s3url, zarr_out, runs=runs)
     elif multiband_vrt:
-        # TODO
         build_zarr_from_multiband_vrt(multiband_vrt, zarr_out, aws_key=aws_key, aws_secret=aws_secret)
     else:
         raise ValueError("No input provided")
