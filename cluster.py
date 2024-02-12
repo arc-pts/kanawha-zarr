@@ -19,16 +19,17 @@ def get_aws_credentials() -> dict[str, str]:
 
 
 def create_cluster(n_workers: int = 2, scheduler_timeout: int = 5,
-                   memory: int = 16, vcpus: int = 4, environment: Optional[dict] = {}) -> FargateCluster:
+                   memory: int = 16, vcpus: int = 4, threads: int = 4,
+                   environment: Optional[dict] = {}) -> FargateCluster:
     print("Creating Fargate cluster...")
     cluster = FargateCluster(n_workers=n_workers,
                              worker_cpu=vcpus * 1024,
                              worker_mem=memory * 1024,
-                             worker_nthreads=vcpus * 1, 
+                             worker_nthreads=vcpus * threads,
                              image="pangeo/pangeo-notebook:latest",
                              environment=environment,
                              scheduler_timeout=f"{scheduler_timeout} minutes",
-                             scheulder_cpu=2 * 1024,
+                             scheduler_cpu=2 * 1024,
                              scheduler_mem=2 * 8 * 1024,)
     print(f"Cluster: {cluster}")
     print(f"Cluster dashboard: {cluster.dashboard_link}")

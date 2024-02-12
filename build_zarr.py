@@ -105,6 +105,7 @@ def build_zarr(multiband_vrt: Optional[str], vrts: Optional[List[str]], s3url: O
                runs: Optional[int], zarr_out: str, cluster: bool = False,
                cluster_workers: int = 2, 
                cluster_worker_vcpus: int = 4, cluster_worker_memory: int = 16,
+               cluster_worker_vcpu_threads: int = 4,
                cluster_scheduler_timeout: int = 5,
                cluster_address: Optional[str] = None, cluster_shutdown: bool = False,
                aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None):
@@ -129,7 +130,7 @@ def build_zarr(multiband_vrt: Optional[str], vrts: Optional[List[str]], s3url: O
                 "AWS_SECRET_ACCESS_KEY": aws_secret,
             }
             cluster = create_cluster(n_workers=cluster_workers, scheduler_timeout=cluster_scheduler_timeout,
-                                     memory=cluster_worker_memory, vcpus=cluster_worker_vcpus,
+                                     memory=cluster_worker_memory, vcpus=cluster_worker_vcpus, threads=cluster_worker_vcpu_threads,
                                      environment=environment)
             client = Client(cluster)
         print(client)
@@ -164,6 +165,8 @@ if __name__ == "__main__":
                         default=4, required=False)
     parser.add_argument("--cluster-worker-memory", type=int, help="Memory per worker for the cluster (GB)",
                         default=16, required=False)
+    parser.add_argument("--cluster-worker-vcpu-threads", type=int, help="Threads per worker vCPU for the cluster",
+                        default=4, required=False)
     parser.add_argument("--cluster-scheduler-timeout", type=int, help="Scheduler timeout for the cluster (mins)",
                          default=5, required=False)
     parser.add_argument("--cluster-address", help="Address of an existing cluster to use", required=False)
@@ -172,6 +175,6 @@ if __name__ == "__main__":
     parser.add_argument("--aws-secret-name", help="Name of env var for AWS Secret Access Key to read/write S3 data", required=False)
     args = parser.parse_args()
     build_zarr(args.multiband_vrt, args.vrts, args.s3url, args.runs, args.zarr_out, args.cluster, args.cluster_workers,
-               args.cluster_worker_vcpus, args.cluster_worker_memory,
+               args.cluster_worker_vcpus, args.cluster_worker_memory, args.cluster_worker_vcpu_threads,
                args.cluster_scheduler_timeout, args.cluster_address, args.cluster_shutdown,
                args.aws_key_name, args.aws_secret_name)
