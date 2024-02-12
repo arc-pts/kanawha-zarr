@@ -72,11 +72,11 @@ def build_zarr_from_multiband_vrt(vrt: str, zarr_out: str, aws_key: Optional[str
     with rasterio.Env(session=session):
         ds = xr.open_dataset(vrt, engine="rasterio")
     ds = ds.rename({"band": "run", "band_data": "depth"})
-    # TODO: wide chunking!!! narrow chunking upfront is waaaay to slow
+    # wide chunking!!! narrow chunking upfront is waaaay to slow
     ds = ds.chunk({
         "run": 1,
-        "x": 2048,
-        "y": 2048,
+        "x": 1024,
+        "y": 1024,
     })
     store = s3fs.S3Map(root=zarr_out, s3=fs)
     ds.to_zarr(store, mode="w", write_empty_chunks=False, consolidated=True)
