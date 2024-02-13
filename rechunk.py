@@ -27,6 +27,10 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
     aws_secret = os.getenv(aws_secret_name)
     if aws_key is None or aws_secret is None:
         raise ValueError(f"AWS credentials for S3 not found ('{aws_key_name}'/'{aws_secret_name})")
+    else:
+        print(f"Using AWS credentials '{aws_key_name}'/'{aws_secret_name}'")
+        print(f"AWS key: {aws_key[0] + '*' * (len(aws_key) - 1)}")
+        print(f"AWS secret: {aws_secret[0] + '*' * (len(aws_secret) - 1)}")
     environment = {
         "AWS_ACCESS_KEY_ID": aws_key,
         "AWS_SECRET_ACCESS_KEY": aws_secret,
@@ -49,7 +53,8 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
     }
     max_mem = rechunker_max_mem * 1e9  # convert from GB to bytes
     store_out = s3fs.S3Map(root=zarr_out, s3=fs)
-    rechunker.rechunk(store_in, target_chunks, max_mem, store_out)
+    temp_store = s3fs.S3Map(root=zarr_temp, s3=fs)
+    rechunker.rechunk(store_in, target_chunks, max_mem, store_out, temp_store=temp_store)
     print(f"Finished: {datetime.now():%Y-%m-%d %H:%M:%S}")
     client.close()
     cluster.close()
