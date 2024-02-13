@@ -57,8 +57,8 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Rechunk Zarr dataset using Dask on AWS Fargate")
-    parser.add_argument("zarr-in", help="Zarr dataset")
-    parser.add_argument("zarr-out", help="Output Zarr dataset")
+    parser.add_argument("zarr_in", help="Zarr dataset")
+    parser.add_argument("zarr_out", help="Output Zarr dataset")
     parser.add_argument("--zarr-temp", type=str, help="Temporary Zarr dataset for rechunking")
     parser.add_argument("--rechunker-max-mem", type=int, default=4, help="Maximum memory for rechunking in GB")
     parser.add_argument("--cluster-workers", type=int, default=2, help="Number of workers in the cluster")
