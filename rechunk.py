@@ -6,6 +6,8 @@ import xarray as xr
 
 from argparse import ArgumentParser
 from datetime import datetime
+import os
+from typing import Optional
 
 
 TARGET_CHUNKS = {
@@ -14,15 +16,24 @@ TARGET_CHUNKS = {
 }
 
 
-def rechunk(zarr_in: str, zarr_out: str, rechunker_max_mem: int,
-            cluster_workers: int, cluster_worker_vcpus: int,
-            cluster_worker_memory: int, cluster_worker_vcpu_threads: int,
-            cluster_scheduler_timeout: int,
-            aws_key_name: str, aws_secret_name: str):
+def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker_max_mem: int = 4,
+            cluster_workers: int = 2, cluster_worker_vcpus: int = 4,
+            cluster_worker_memory: int = 16, cluster_worker_vcpu_threads: int = 4,
+            cluster_scheduler_timeout: int = 5,
+            aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None):
     print(f"Started: {datetime.now():%Y-%m-%d %H:%M:%S}")
+    aws_key = os.getenv(aws_key_name)
+    aws_secret = os.getenv(aws_secret_name)
+    if aws_key is None or aws_secret is None:
+        raise ValueError(f"AWS credentials for S3 not found ('{aws_key_name}'/'{aws_secret_name})")
+    environment = {
+        "AWS_ACCESS_KEY_ID": aws_key,
+        "AWS_SECRET_ACCESS_KEY": aws_secret,
+    }
     cluster = create_cluster(n_workers=cluster_workers, scheduler_timeout=cluster_scheduler_timeout,
-                             memory=cluster_worker_memory, vcpus=cluster_worker_vcpus, threads=cluster_worker_vcpu_threads,
-                             environment={"AWS_ACCESS_KEY_ID": "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY"})
+                             memory=cluster_worker_memory, vcpus=cluster_worker_vcpus,
+                             threads=cluster_worker_vcpu_threads,
+                             environment=environment)
     print(cluster)
     print(f"Cluster dashboard: {cluster.dashboard_link}")
     print(f"Rechunking {zarr_in} to {zarr_out}...")
@@ -43,6 +54,7 @@ if __name__ == "__main__":
     parser = ArgumentParser(description="Rechunk Zarr dataset using Dask on AWS Fargate")
     parser.add_argument("zarr-in", help="Zarr dataset")
     parser.add_argument("zarr-out", help="Output Zarr dataset")
+    parser.add_argument("--zarr-temp", type=str, help="Temporary Zarr dataset for rechunking")
     parser.add_argument("--rechunker-max-mem", type=int, default=4, help="Maximum memory for rechunking in GB")
     parser.add_argument("--cluster-workers", type=int, default=2, help="Number of workers in the cluster")
     parser.add_argument("--cluster-worker-vcpus", type=int, default=4, help="Number of vCPUs per worker")
@@ -52,7 +64,7 @@ if __name__ == "__main__":
     parser.add_argument("--aws-key-name", help="Name of env var for AWS Access Key ID to read/write S3 data", required=False)
     parser.add_argument("--aws-secret-name", help="Name of env var for AWS Secret Access Key to read/write S3 data", required=False)
     args = parser.parse_args()
-    rechunk(args.zarr_in, args.zarr_out, args.rechunker_max_mem,
+    rechunk(args.zarr_in, args.zarr_out, args.zarr_temp, args.rechunker_max_mem,
             args.cluster_workers, args.cluster_worker_vcpus, args.cluster_worker_memory,
             args.cluster_worker_vcpu_threads, args.cluster_scheduler_timeout,
             args.aws_key_name, args.aws_secret_name)
