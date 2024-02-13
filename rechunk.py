@@ -1,7 +1,8 @@
 from cluster import create_cluster
 
-import s3fs
+from dask.distributed import Client
 import rechunker
+import s3fs
 import xarray as xr
 
 from argparse import ArgumentParser
@@ -36,6 +37,8 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
                              environment=environment)
     print(cluster)
     print(f"Cluster dashboard: {cluster.dashboard_link}")
+    client = Client(cluster)
+    print(client)
     print(f"Rechunking {zarr_in} to {zarr_out}...")
     fs = s3fs.S3FileSystem(key=aws_key_name, secret=aws_secret_name)
     store_in = s3fs.S3Map(root=zarr_in, s3=fs)
@@ -48,6 +51,8 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
     store_out = s3fs.S3Map(root=zarr_out, s3=fs)
     rechunker.rechunk(store_in, target_chunks, max_mem, store_out)
     print(f"Finished: {datetime.now():%Y-%m-%d %H:%M:%S}")
+    client.close()
+    cluster.close()
 
 
 if __name__ == "__main__":
