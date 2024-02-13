@@ -75,8 +75,8 @@ def build_zarr_from_multiband_vrt(vrt: str, zarr_out: str, aws_key: Optional[str
     # wide chunking!!! narrow chunking upfront is waaaay to slow
     ds = ds.chunk({
         "run": 1,
-        "x": 1024,
-        "y": 1024,
+        "x": 4096,
+        "y": 4096,
     })
     store = s3fs.S3Map(root=zarr_out, s3=fs)
     ds.to_zarr(store, mode="w", write_empty_chunks=False, consolidated=True)
@@ -107,7 +107,7 @@ def build_zarr(multiband_vrt: Optional[str], vrts: Optional[List[str]], s3url: O
                cluster_worker_vcpus: int = 4, cluster_worker_memory: int = 16,
                cluster_worker_vcpu_threads: int = 4,
                cluster_scheduler_timeout: int = 5,
-               cluster_address: Optional[str] = None, cluster_shutdown: bool = False,
+               cluster_address: Optional[str] = None, dont_shutdown: bool = False,
                aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None):
     print(f"Started: {datetime.now():%Y-%m-%d %H:%M:%S}")
     aws_key = os.getenv(aws_key_name)
@@ -142,7 +142,7 @@ def build_zarr(multiband_vrt: Optional[str], vrts: Optional[List[str]], s3url: O
         build_zarr_from_multiband_vrt(multiband_vrt, zarr_out, aws_key=aws_key, aws_secret=aws_secret)
     else:
         raise ValueError("No input provided")
-    if cluster and cluster_shutdown:
+    if cluster and not dont_shutdown:
         print("Closing cluster...")
         cluster.close()
     print(f"Finished: {datetime.now():%Y-%m-%d %H:%M:%S}")
@@ -170,11 +170,11 @@ if __name__ == "__main__":
     parser.add_argument("--cluster-scheduler-timeout", type=int, help="Scheduler timeout for the cluster (mins)",
                          default=5, required=False)
     parser.add_argument("--cluster-address", help="Address of an existing cluster to use", required=False)
-    parser.add_argument("--cluster-shutdown", help="Shutdown the cluster", action="store_true")
+    parser.add_argument("--dont-shutdown", help="Don't shut down the cluster", action="store_true")
     parser.add_argument("--aws-key-name", help="Name of env var for AWS Access Key ID to read/write S3 data", required=False)
     parser.add_argument("--aws-secret-name", help="Name of env var for AWS Secret Access Key to read/write S3 data", required=False)
     args = parser.parse_args()
     build_zarr(args.multiband_vrt, args.vrts, args.s3url, args.runs, args.zarr_out, args.cluster, args.cluster_workers,
                args.cluster_worker_vcpus, args.cluster_worker_memory, args.cluster_worker_vcpu_threads,
-               args.cluster_scheduler_timeout, args.cluster_address, args.cluster_shutdown,
+               args.cluster_scheduler_timeout, args.cluster_address, args.dont_shutdown,
                args.aws_key_name, args.aws_secret_name)
