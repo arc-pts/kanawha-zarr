@@ -44,7 +44,7 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
     client = Client(cluster)
     print(client)
     print(f"Rechunking {zarr_in} to {zarr_out}...")
-    fs = s3fs.S3FileSystem(key=aws_key_name, secret=aws_secret_name)
+    fs = s3fs.S3FileSystem(key=aws_key, secret=aws_secret)
     store_in = s3fs.S3Map(root=zarr_in, s3=fs)
     ds = xr.open_zarr(store_in)
     target_chunks = {
