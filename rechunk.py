@@ -35,6 +35,15 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
         "AWS_ACCESS_KEY_ID": aws_key,
         "AWS_SECRET_ACCESS_KEY": aws_secret,
     }
+    print("Creating cluster...")
+    cluster = create_cluster(n_workers=cluster_workers, scheduler_timeout=cluster_scheduler_timeout,
+                             memory=cluster_worker_memory, vcpus=cluster_worker_vcpus,
+                             threads=cluster_worker_vcpu_threads,
+                             environment=environment)
+    print(cluster)
+    print(f"Cluster dashboard: {cluster.dashboard_link}")
+    client = Client(cluster)
+    print(client)
     print(f"Creating rechunking plan from {zarr_in} to {zarr_out}...")
     fs = s3fs.S3FileSystem(key=aws_key, secret=aws_secret)
     store_in = s3fs.S3Map(root=zarr_in, s3=fs)
@@ -49,15 +58,6 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
     print("Creating plan...")
     plan = rechunker.rechunk(ds, target_chunks, max_mem, store_out, temp_store=temp_store)
     print(plan)
-    print("Creating cluster...")
-    cluster = create_cluster(n_workers=cluster_workers, scheduler_timeout=cluster_scheduler_timeout,
-                             memory=cluster_worker_memory, vcpus=cluster_worker_vcpus,
-                             threads=cluster_worker_vcpu_threads,
-                             environment=environment)
-    print(cluster)
-    print(f"Cluster dashboard: {cluster.dashboard_link}")
-    client = Client(cluster)
-    print(client)
     print(f"Executing rechunking plan...")
     plan.execute()
     print(f"Finished: {datetime.now():%Y-%m-%d %H:%M:%S}")
