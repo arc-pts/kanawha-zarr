@@ -46,6 +46,7 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
     max_mem = rechunker_max_mem * 1e9  # convert from GB to bytes
     store_out = s3fs.S3Map(root=zarr_out, s3=fs)
     temp_store = s3fs.S3Map(root=zarr_temp, s3=fs)
+    print("Creating plan...")
     plan = rechunker.rechunk(ds, target_chunks, max_mem, store_out, temp_store=temp_store)
     print(plan)
     print("Creating cluster...")
