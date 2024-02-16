@@ -1,4 +1,5 @@
 from cluster import create_cluster
+from usgs_quad import UsgsQuad, find_intersecting_quads
 
 from dask.distributed import Client
 import rechunker
@@ -8,6 +9,7 @@ import xarray as xr
 from argparse import ArgumentParser
 from datetime import datetime
 import os
+from pathlib import Path
 from typing import Optional
 
 
@@ -17,11 +19,21 @@ TARGET_CHUNKS = {
 }
 
 
-def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker_max_mem: int = 4,
+def rechunk(ds: xr.Dataset, target_chunks: dict, max_mem: int, store_out: s3fs.S3Map, temp_store: Optional[s3fs.S3Map] = None):
+    print("Creating plan...")
+    plan = rechunker.rechunk(ds, target_chunks, max_mem, store_out, temp_store=temp_store)
+    print(plan)
+    print(f"Executing rechunking plan...")
+    plan.execute()
+    print(f"Finished: {datetime.now():%Y-%m-%d %H:%M:%S}")
+
+
+def main(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker_max_mem: int = 4,
             cluster_workers: int = 2, cluster_worker_vcpus: int = 4,
             cluster_worker_memory: int = 16, cluster_worker_vcpu_threads: int = 4,
             cluster_scheduler_timeout: int = 5,
-            aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None):
+            aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None,
+            usgs_quads: bool = False):
     print(f"Started: {datetime.now():%Y-%m-%d %H:%M:%S}")
     aws_key = os.getenv(aws_key_name)
     aws_secret = os.getenv(aws_secret_name)
@@ -53,13 +65,26 @@ def rechunk(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechun
         "run": ds.run.size,
     }
     max_mem = rechunker_max_mem * 1e9  # convert from GB to bytes
-    store_out = s3fs.S3Map(root=zarr_out, s3=fs)
-    temp_store = s3fs.S3Map(root=zarr_temp, s3=fs)
-    print("Creating plan...")
-    plan = rechunker.rechunk(ds, target_chunks, max_mem, store_out, temp_store=temp_store)
-    print(plan)
-    print(f"Executing rechunking plan...")
-    plan.execute()
+    if usgs_quads:
+        lat_lower_left = ds.y.min().item()
+        lon_lower_left = ds.x.min().item()
+        lat_upper_right = ds.y.max().item()
+        lon_upper_right = ds.x.max().item()
+        quads = find_intersecting_quads(lat_lower_left, lon_lower_left, lat_upper_right, lon_upper_right)
+        for quad in quads:
+            # select data for the quad
+            ds_quad = ds.sel(x=slice(quad.min_lon, quad.max_lon), y=slice(quad.min_lat, quad.max_lat))
+            print(ds_quad)
+            print(f"Rechunking {quad}...")
+            quad_zarr_out = zarr_out.rstrip(".zarr") + f".{quad.quad_id}.zarr"
+            quad_zarr_temp = zarr_temp.rstrip(".zarr") + f".{quad.quad_id}.temp.zarr"
+            store_out = s3fs.S3Map(root=quad_zarr_out, s3=fs)
+            temp_store = s3fs.S3Map(root=quad_zarr_temp, s3=fs)
+            rechunk(ds, target_chunks, max_mem, store_out, temp_store=temp_store)
+    else:
+        store_out = s3fs.S3Map(root=zarr_out, s3=fs)
+        temp_store = s3fs.S3Map(root=zarr_temp, s3=fs)
+        rechunk(ds, target_chunks, max_mem, store_out, temp_store=temp_store)
     print(f"Finished: {datetime.now():%Y-%m-%d %H:%M:%S}")
     client.close()
     cluster.close()
@@ -69,6 +94,7 @@ if __name__ == "__main__":
     parser = ArgumentParser(description="Rechunk Zarr dataset using Dask on AWS Fargate")
     parser.add_argument("zarr_in", help="Zarr dataset")
     parser.add_argument("zarr_out", help="Output Zarr dataset")
+    parser.add_argument("--usgs-quads", help="Separate output by USGS 7.5-minute quads", action="store_true")
     parser.add_argument("--zarr-temp", type=str, help="Temporary Zarr dataset for rechunking")
     parser.add_argument("--rechunker-max-mem", type=int, default=4, help="Maximum memory for rechunking in GB")
     parser.add_argument("--cluster-workers", type=int, default=2, help="Number of workers in the cluster")
@@ -79,7 +105,14 @@ if __name__ == "__main__":
     parser.add_argument("--aws-key-name", help="Name of env var for AWS Access Key ID to read/write S3 data", required=False)
     parser.add_argument("--aws-secret-name", help="Name of env var for AWS Secret Access Key to read/write S3 data", required=False)
     args = parser.parse_args()
-    rechunk(args.zarr_in, args.zarr_out, args.zarr_temp, args.rechunker_max_mem,
-            args.cluster_workers, args.cluster_worker_vcpus, args.cluster_worker_memory,
-            args.cluster_worker_vcpu_threads, args.cluster_scheduler_timeout,
-            args.aws_key_name, args.aws_secret_name)
+    main(args.zarr_in, args.zarr_out,
+         zarr_temp=args.zarr_temp,
+         rechunker_max_mem=args.rechunker_max_mem,
+         cluster_workers=args.cluster_workers,
+         cluster_worker_vcpus=args.cluster_worker_vcpus,
+         cluster_worker_memory=args.cluster_worker_memory,
+         cluster_worker_vcpu_threads=args.cluster_worker_vcpu_threads,
+         cluster_scheduler_timeout=args.cluster_scheduler_timeout,
+         aws_key_name=args.aws_key_name,
+         aws_secret_name=args.aws_secret_name,
+         usgs_quads=args.usgs_quads)
