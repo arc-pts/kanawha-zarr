@@ -73,6 +73,7 @@ def main(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker
         quads = find_intersecting_quads(lat_lower_left, lon_lower_left, lat_upper_right, lon_upper_right)
         for quad in quads:
             # select data for the quad
+            print(quad)
             ds_quad = ds.sel(x=slice(quad.min_lon, quad.max_lon), y=slice(quad.min_lat, quad.max_lat))
             print(ds_quad)
             print(f"Rechunking {quad}...")
