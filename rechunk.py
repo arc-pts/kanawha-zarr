@@ -31,11 +31,12 @@ def rechunk(ds: xr.Dataset, target_chunks: dict, max_mem: int, store_out: s3fs.S
 
 
 def main(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker_max_mem: int = 4,
-            cluster_workers: int = 2, cluster_worker_vcpus: int = 4,
-            cluster_worker_memory: int = 16, cluster_worker_vcpu_threads: int = 4,
-            cluster_scheduler_timeout: int = 5,
-            aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None,
-            usgs_quads: bool = False):
+         cluster_workers: int = 2, cluster_worker_vcpus: int = 4,
+         cluster_worker_memory: int = 16, cluster_worker_vcpu_threads: int = 4,
+         cluster_scheduler_timeout: int = 5,
+         aws_key_name: Optional[str] = None, aws_secret_name: Optional[str] = None,
+         usgs_quads: bool = False,
+         quad_ids: Optional[str] = None):
     print(f"Started: {datetime.now():%Y-%m-%d %H:%M:%S}")
     aws_key = os.getenv(aws_key_name)
     aws_secret = os.getenv(aws_secret_name)
@@ -68,11 +69,14 @@ def main(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker
     }
     max_mem = rechunker_max_mem * 1e9  # convert from GB to bytes
     if usgs_quads:
-        lat_lower_left = ds.y.min().item()
-        lon_lower_left = ds.x.min().item()
-        lat_upper_right = ds.y.max().item()
-        lon_upper_right = ds.x.max().item()
-        quads = find_intersecting_quads(lat_lower_left, lon_lower_left, lat_upper_right, lon_upper_right)
+        if quad_ids:
+            quads = [UsgsQuad(q) for q in quads.split(",")]
+        else:
+            lat_lower_left = ds.y.min().item()
+            lon_lower_left = ds.x.min().item()
+            lat_upper_right = ds.y.max().item()
+            lon_upper_right = ds.x.max().item()
+            quads = find_intersecting_quads(lat_lower_left, lon_lower_left, lat_upper_right, lon_upper_right)
         for quad in quads:
             # select data for the quad
             print(quad)
@@ -105,6 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("zarr_in", help="Zarr dataset")
     parser.add_argument("zarr_out", help="Output Zarr dataset")
     parser.add_argument("--usgs-quads", help="Separate output by USGS 7.5-minute quads", action="store_true")
+    parser.add_argument("--quad-ids", type=str, help="Comma-separated list of USGS 7.5-minute quad ID")
     parser.add_argument("--zarr-temp", type=str, help="Temporary Zarr dataset for rechunking")
     parser.add_argument("--rechunker-max-mem", type=int, default=4, help="Maximum memory for rechunking in GB")
     parser.add_argument("--cluster-workers", type=int, default=2, help="Number of workers in the cluster")
@@ -125,4 +130,5 @@ if __name__ == "__main__":
          cluster_scheduler_timeout=args.cluster_scheduler_timeout,
          aws_key_name=args.aws_key_name,
          aws_secret_name=args.aws_secret_name,
-         usgs_quads=args.usgs_quads)
+         usgs_quads=args.usgs_quads,
+         quad_ids=args.quad_ids)
