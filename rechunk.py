@@ -70,7 +70,7 @@ def main(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker
     max_mem = rechunker_max_mem * 1e9  # convert from GB to bytes
     if usgs_quads:
         if quad_ids:
-            quads = [UsgsQuad(q) for q in quads.split(",")]
+            quads = [UsgsQuad(q) for q in quad_ids.split(",")]
         else:
             lat_lower_left = ds.y.min().item()
             lon_lower_left = ds.x.min().item()
