@@ -77,9 +77,10 @@ def main(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker
             ds_quad = ds.sel(x=slice(quad.min_lon, quad.max_lon), y=slice(quad.max_lat, quad.min_lat))
             print(ds_quad)
             zarr_in_quad = zarr_in.rstrip(".zarr") + f".{quad.quad_id}.zarr"
+            store_in_quad = s3fs.S3Map(root=zarr_in_quad, s3=fs)
             # Split the input Zarr dataset by quad
             print(f"Splitting out {quad}...")
-            ds_quad.to_zarr(zarr_in_quad, mode="w", consolidated=True)
+            ds_quad.to_zarr(store_in_quad, mode="w", consolidated=True)
             ds_quad = xr.open_zarr(zarr_in_quad)
             print(f"Rechunking {quad}...")
             quad_zarr_out = zarr_out.rstrip(".zarr") + f".{quad.quad_id}.zarr"
