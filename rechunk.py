@@ -74,7 +74,7 @@ def main(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker
         for quad in quads:
             # select data for the quad
             print(quad)
-            ds_quad = ds.sel(x=slice(quad.min_lon, quad.max_lon), y=slice(quad.min_lat, quad.max_lat))
+            ds_quad = ds.sel(x=slice(quad.min_lon, quad.max_lon), y=slice(quad.max_lat, quad.min_lat))
             print(ds_quad)
             print(f"Rechunking {quad}...")
             quad_zarr_out = zarr_out.rstrip(".zarr") + f".{quad.quad_id}.zarr"
