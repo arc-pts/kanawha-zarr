@@ -81,7 +81,7 @@ def main(zarr_in: str, zarr_out: str, zarr_temp: Optional[str] = None, rechunker
             quad_zarr_temp = zarr_temp.rstrip(".zarr") + f".{quad.quad_id}.temp.zarr"
             store_out = s3fs.S3Map(root=quad_zarr_out, s3=fs)
             temp_store = s3fs.S3Map(root=quad_zarr_temp, s3=fs)
-            rechunk(ds, target_chunks, max_mem, store_out, temp_store=temp_store)
+            rechunk(ds_quad, target_chunks, max_mem, store_out, temp_store=temp_store)
     else:
         store_out = s3fs.S3Map(root=zarr_out, s3=fs)
         temp_store = s3fs.S3Map(root=zarr_temp, s3=fs)
