@@ -79,7 +79,7 @@ def find_intersecting_quads(lower_left_lat, lower_left_lon,
             print(current_lat, current_lon)
             quad = UsgsQuad.from_lat_lon(current_lat, current_lon)
             print(quad, quad.quad_id)
-            min_lat, max_lat, min_lon, max_lon = quad.get_bounds()
+            min_lat, max_lat, min_lon, max_lon = quad.bounds
             print(min_lat, max_lat, min_lon, max_lon)
             # Check if the quad intersects with the given extent
             # Favor the bottom and left edges
